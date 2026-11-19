@@ -1,51 +1,180 @@
-﻿## Twitch Stream Highlights to YT Automatic Uploader (AutoBot Clipper)
+﻿# 🎮 AutoBot Clipper: Fully Automated GTA 6 Live Stream Clipper & YouTube Shorts Publisher
 
-This script can be used to automatically extract highlights (or clips) from a twitch stream (with rewind enabled) and then upload the same to a YouTube channel. It can be used to completely automate a twitch highlights channel.
+[![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
+[![FFmpeg](https://img.shields.io/badge/FFmpeg-9.0%2B-green.svg)](https://ffmpeg.org/)
+[![Twitch Helix API](https://img.shields.io/badge/Twitch-Helix%20API-9146FF.svg)](https://dev.twitch.tv/)
+[![YouTube Data API v3](https://img.shields.io/badge/YouTube-Data%20API%20v3-FF0000.svg)](https://developers.google.com/youtube/v3)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-It needs the following manual input to work:
-1. Provide timestamps of the clip to be extracted from a stream.
-2. Set the title, description, tags and privacy status of the video when uploading to YouTube
+**AutoBot Clipper** is an autonomous, end-to-end AI system that automatically monitors live **GTA 6** streams across **Twitch and YouTube**, captures real-time high-energy gameplay, detects viral moments using multi-signal AI analysis, formats clips into vertical **9:16 YouTube Shorts** with animated subtitles, generates context-aware SEO metadata, and publishes them directly to your YouTube channel.
 
+Zero manual timestamps. Zero manual video editing. Zero manual uploading.
 
-## Setup
-Clone the script
+---
 
-    git clone https://github.com/teja156/autobot-clipper
+## ✨ Features
 
-Install the requirements with pip
+- **🔴 Multi-Platform Live Discovery**:
+  - Automatically identifies live GTA 6 streamers on **Twitch** (KaiCenat, Jynxzi, xQc, stableronaldo, etc.).
+  - Detects live streams from top creators like **IShowSpeed** on **YouTube**.
+  - Enforces English-first and UK gaming streamer prioritization.
+  - Fair round-robin rotation so no single streamer dominates your uploads.
 
-    pip install -r requirements.txt
+- **🧠 Multi-Modal AI Highlight Detection**:
+  - **Audio Energy**: Detects sudden loudness spikes, screams, and genuine laughter using RMS and Zero Crossing Rate analysis.
+  - **Speech Recognition**: Transcribes spoken dialogue with `faster-whisper`, detecting excitement keywords and swearing.
+  - **Visual Action**: Analyzes video frame dynamics via OpenCV to detect vehicle crashes, police chases, gunfights, and sudden explosions.
+  - **Smart Duration Snapping**: Targets **45-second clips** (42–48s) while intelligently snapping to sentence boundaries so dialogue is never cut in half.
+  - **Strict Quality Filter**: Rejects calm, silent, or repetitive footage.
 
-## YouTube API Setup
+- **📱 Smart YouTube Shorts Video Editor**:
+  - Automatically converts horizontal 16:9 gameplay to vertical **9:16 (1080 × 1920)** Shorts.
+  - **Alternating Layouts**:
+    - **Split-Screen Layout**: Gameplay on the upper half, streamer facecam on the lower half.
+    - **Blurred Background Fill**: High-definition gameplay centered over an aesthetically blurred background.
+  - **Animated Subtitles**: Burns high-contrast, yellow-highlighted captions directly into the Shorts safe area using ASS subtitles.
 
-You need to first create an account on Google Cloud Platform in-order to use the YouTube Data API v3 (which is required to programatically upload videos to YouTube). Follow these steps to do so:
-1.  Create an account on the  [Google Developers Console](https://console.developers.google.com/)
-2.  Register a new app there
-3.  Enable the Youtube API (APIs & Services -> Enable APIs and Services)
-4. Go to APIs & Services -> OAuth Consent screen.
-5. Configure your App name, developer email, etc and go to **Scopes**
-6. Add the scope '**youtube.upload**', and then 'Save and Continue'
-7. Add the email address of the channel in 'Test Users' and Save.
-8.  Create Client ID (APIs & Services -> Credentials -> Create Credentials), select 'Oauth client ID', select type 'Web application'
-9.  Add an 'Authorized redirect URI' of '[http://localhost:8080/oauth2callback](http://localhost:8080/oauth2callback)'
-10.  Download the client secrets JSON file (click download icon next to newly created client ID) and save it as file  `client_secrets.json`  in the same directory as the script.
+- **🏷️ AI Metadata & SEO Generation**:
+  - Generates curiosity-driven, relatable titles based on the actual dialogue and event.
+  - **Mandatory Hashtags**: Guarantees every title strictly ends with `#shorts #gtavi #gta6`.
+  - Crafts UK gaming-optimized descriptions with original streamer attribution.
+  - Generates 20–25 SEO tags tailored to the streamer and specific event.
 
-## Run
-1. First run `config.py` to authenticate your channel with YouTube API. This will create a file named **credentials.txt** in the same directory. You only need to run this once.
- `python config.py`
-2. Run `bot.py` to start the script. 
-`python bot.py`
+- **🚀 YouTube Data API v3 Publisher**:
+  - Resumable video uploads with exponential backoff retry.
+  - Supports both **Public** and **Private** privacy statuses.
+  - **Disk Space Protection**: Strictly enforces a **10 GB local disk limit** and auto-deletes local video files immediately after successful upload.
+  - **Pacing**: Configurable random delay (8 to 10 minutes) between uploads, targeting 15 Shorts per day.
+  - **Local Midnight Reset**: Automatically resets the daily upload count at 12:00 AM in your local timezone.
 
-***NOTE:*** For *Twitch VOD URL*, make sure you enter the URL of the video and not the live stream. For example, `https://twitch.tv/shroud` is an invalid input, you must enter something like `https://www.twitch.tv/videos/1088769006` 
-You can find the VOD URL by going to `https://twitch.tv/username/videos` and open the most recent video, this is same as the current live stream but here you can also rewind the stream. However, the vod will be available in the videos page only if the streamer enables "*past broadcasts*" option on his/her channel.
+- **📊 Web Dashboard & Controller**:
+  - Real-time Flask dashboard displaying active live streams, generated clips, scores, upload history, and disk usage.
+  - Single-click controls to toggle automation loop, trigger one-off captures, or reset daily counters.
 
-If your video belongs to any category other than Gaming, you need to mention the appropriate category ID. You can find the list of categoy IDs [here.](https://gist.github.com/dgp/1b24bf2961521bd75d6c)
+---
 
-You can also use a constant description for all your uploads by changing the text in ***constdesc.txt*** file. The credits text will be automatically appended to the description while uploading the video. You can also specify hashtags to include in the description.
- 
+## 🛠️ Architecture
 
-### Using YouTube Upload Utility Manually
-You can also upload a video manually with `ytupload_util.py`
+```text
+autobot-clipper/
+│
+├── bot.py                     # Multi-mode CLI and automation runner
+├── config.py                  # API health check and YouTube OAuth helper
+├── requirements.txt           # Modern Python dependencies
+├── .env                       # Twitch API credentials (git-ignored)
+├── client_secrets.json        # Google OAuth desktop credentials (git-ignored)
+│
+├── modules/
+│   ├── twitch_discovery.py    # Twitch Helix API stream & VOD discovery
+│   ├── vod_downloader.py      # Streamlink & yt-dlp live capturer & disk manager
+│   ├── audio_analyser.py      # RMS loudness and scream detector
+│   ├── speech_analyser.py     # Faster-Whisper transcriber & sentiment analyzer
+│   ├── visual_analyser.py     # OpenCV visual motion & action analyzer
+│   ├── chat_analyser.py       # Twitch chat replay velocity & hype analyzer
+│   ├── highlight_detector.py  # Multi-signal highlight scoring & 45s window snapper
+│   ├── shorts_editor.py       # 9:16 vertical formatter (stacked facecam & blurred bg)
+│   ├── subtitle_generator.py  # High-contrast ASS animated subtitles
+│   ├── metadata_generator.py  # Contextual titles, tags, and mandatory hashtags
+│   ├── youtube_uploader.py    # Resumable YouTube Data API v3 uploader
+│   ├── scheduler.py           # Background automation loop & streamer rotation
+│   ├── database.py            # SQLite database manager
+│   └── dashboard.py           # Local Flask web controller
+│
+├── database/                  # SQLite storage for clips, status & logs
+├── downloads/                 # Temporary raw captures (auto-deleted)
+├── clips/                     # Rendered Shorts (auto-deleted upon upload)
+└── tests/                     # Pipeline unit and integration tests
+```
 
-    python ytupload_util.py
-Fill the required inputs (video file, title, description, tags, privacy status) and the video will be uploaded!
+---
+
+## 🚀 Quick Start
+
+### 1. Prerequisites
+- Python 3.10+ (tested on Python 3.13)
+- [FFmpeg](https://ffmpeg.org/download.html) installed and added to your system `PATH`.
+
+### 2. Installation
+Clone the repository and set up a virtual environment:
+
+```bash
+git clone https://github.com/anshaj4/gta6-shorts-clipper.git
+cd gta6-shorts-clipper
+
+python -m venv venv
+.\venv\Scripts\activate  # On Windows
+# source venv/bin/activate  # On Linux / macOS
+
+pip install -r requirements.txt
+```
+
+### 3. API Configuration
+
+1. **Twitch API**:
+   Create an application on [Twitch Developer Console](https://dev.twitch.tv/console). Create a `.env` file in the project root:
+   ```env
+   TWITCH_CLIENT_ID=your_twitch_client_id
+   TWITCH_CLIENT_SECRET=your_twitch_client_secret
+   ```
+
+2. **YouTube API**:
+   - Create a Google Cloud project with the **YouTube Data API v3** enabled.
+   - Configure OAuth Consent screen (Scope: `https://www.googleapis.com/auth/youtube.upload`).
+   - Download the Desktop Application OAuth client credentials and save as `client_secrets.json` in the project root.
+   - Run the one-time authorization:
+     ```bash
+     python config.py --auth
+     ```
+
+---
+
+## 🖥️ Usage
+
+### Run the Web Dashboard
+```bash
+python bot.py --mode dashboard
+```
+Open `http://localhost:5000` in your browser. From here you can view active live streams, monitor live storage, trigger one-click clips, and start the background automation loop.
+
+### Run Headless Automation Loop
+```bash
+python bot.py --mode auto
+```
+Runs the continuous autonomous loop:
+- Discovers live GTA 6 streamers (IShowSpeed, KaiCenat, Jynxzi, etc.).
+- Rotates streamers so each creator is highlighted fairly.
+- Captures 3-minute live segments and extracts the highest-scoring 45-second moment.
+- Formats to 9:16 (alternating stacked facecam and blurred background).
+- Publishes directly to YouTube as Public.
+- Waits 8 to 10 minutes between uploads, targeting 15 Shorts per day.
+- Auto-deletes local files to stay well within the 10 GB disk limit.
+
+### Run Single Cycle
+```bash
+python bot.py --mode once
+```
+
+### Legacy Interactive Mode
+```bash
+python bot.py --mode interactive
+```
+
+---
+
+## 🧪 Testing
+
+Run the included automated test suite:
+```bash
+python -m unittest tests/test_pipeline.py
+```
+
+---
+
+## 🔒 Security
+- All sensitive files (`client_secrets.json`, `.env`, `token.json`, `credentials.txt`, `database/`, media folders) are strictly excluded via `.gitignore`.
+- YouTube credentials use desktop OAuth with automatic token refresh.
+
+---
+
+## 📄 License
+This project is licensed under the MIT License.

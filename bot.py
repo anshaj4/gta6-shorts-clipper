@@ -1,179 +1,117 @@
-# Input Twitch vod URL
-# Input timestamps of the clip
-# Retrieve the clip from the twitch live stream
-# Show the clip for preview
-# Open Video trimmer for editting the clip
-# Input Title, Description, Tags
-# Input credits
-# Upload to YT
-# Show YT link
-
-
 import os
-import os.path
-import re
 import sys
-from datetime import datetime
-import pytz
+import argparse
+import logging
+from dotenv import load_dotenv
+
+load_dotenv()
+
+from modules.scheduler import Scheduler
+from modules.dashboard import run_dashboard
+from modules import database
 import videotrim_util
 import ytupload_util
-import webbrowser
-import time
 
-
-default_description = ""
-default_categoryId = "20"
-
-try:
-	f=open("constdesc.txt")
-	default_description=f.read()
-	f.close()
-except Exception as e:
-	default_description=""
-
-
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+logger = logging.getLogger("AutoBotClipper")
 
 def credits():
-	print("[~] Written by Teja Swaroop (https://techraj156.com)")
-	print("[~] Thanks to streamlink CLI (https://streamlink.github.io)")
-	print()
+    print("""
+=============================================================
+  GTA 6 Twitch Clipper & YouTube Shorts Publisher (AutoBot)
+  Automated Discovery | AI Highlights | Shorts Editor | Uploader
+=============================================================
+    """)
 
+def run_legacy_interactive():
+    credits()
+    print("[*] Running in Legacy Interactive Mode...")
+    creator_name = input("[+] Twitch Creator name: ").replace(" ", "")
+    twitch_url = input("[+] Twitch VOD URL: ")
+    start_time = input("[+] Clip Start time (HH:MM:SS): ")
+    end_time = input("[+] Clip End time (HH:MM:SS): ")
 
-def checks():
-	# check if client_secret.json and credentials.txt files are present
-	if not os.path.isfile("client_secrets.json"):
-		print("[!] Client Secret file is missing. Make sure you download it from your GCP dashboard and place it in the current directory")
-		sys.exit(0)
+    from modules.vod_downloader import VODDownloader
+    downloader = VODDownloader()
 
-	if not os.path.isfile("credentials.txt"):
-		# Trigger flask server to enable use to authenticate with their account
-		print("[!] credentials.txt is missing!")
-		print("[!] You need to initially authenticate with your Google Account so that the video can be uploaded to your channel. Don't worry, you only need to do this once.")
-		print("[-] Run config.py to authenticate with your google account and create credentials.txt")
+    def parse_hms(s):
+        parts = list(map(int, s.split(":")))
+        return parts[0] * 3600 + parts[1] * 60 + parts[2]
 
-def validateInput(inp, pattern):
-	if re.search(pattern, inp):
-		return True
-	return False
+    start_sec = parse_hms(start_time)
+    end_sec = parse_hms(end_time)
+    duration = end_sec - start_sec
 
+    filename = downloader.download_vod_segment(twitch_url, start_sec, duration)
+    if not filename or not os.path.isfile(filename):
+        print("[!] Download failed!")
+        return
 
-def getOffsetAndDuration(start_time, end_time):
-	start_do = datetime.strptime(start_time, "%H:%M:%S")
-	end_do = datetime.strptime(end_time, "%H:%M:%S")
-	offset = start_time
-	duration = str(end_do-start_do).split(".")[0]
-	return [offset,duration]
+    print(f"[*] Downloaded clip successfully: {filename}")
+    try:
+        os.startfile(filename)
+    except Exception:
+        pass
 
+    op = input("[+] Do you want to trim the video? (Y/n): ").strip().lower()
+    if op in ["y", ""]:
+        if videotrim_util.trimVideo(filename):
+            print("[*] Video trimmed successfully!")
+            filename = os.path.splitext(filename)[0] + "_trimmed.mp4"
 
-def getTwitchClip(creator_name, twitch_url, offset, duration):
-	print("[*] Getting clip from Twitch Live Stream with streamlink..")
-	# Use Streamlink to get the clip
-	filename = os.path.join("clips",creator_name+(datetime.now(pytz.timezone('Asia/Kolkata'))).strftime("%m%d%Y-%H_%M_%S")+".ts")
+    op = input("[+] Upload to YouTube? (Y/n): ").strip().lower()
+    if op in ["y", ""]:
+        yt_title = input("[+] Video Title: ")
+        yt_description = input("[+] Video Description (leave empty for default): ")
+        yt_tags = input("[+] Video Tags (separated by commas): ")
+        yt_categoryId = input("[+] Category ID (Leave empty for Gaming - 20): ") or "20"
+        yt_privacyStatus = input("[+] Privacy Status (public/private/unlisted, default private): ") or "private"
+        yt_credits = input("[+] Credits for Original Creator: ")
 
-	cmd = "streamlink %s best --hls-start-offset %s --hls-duration %s -o %s"%(twitch_url,offset,duration,filename)
-	print("[*] %s"%cmd)
-	os.system(cmd)
-	return filename
-	
+        if yt_credits:
+            yt_description += f"\nCredits:\n{yt_credits}"
+
+        videoId = ytupload_util.upload(filename, yt_title, yt_description, yt_tags, yt_categoryId, yt_privacyStatus)
+        if videoId:
+            print(f"[*] Successfully uploaded video: https://www.youtube.com/watch?v={videoId}")
+        else:
+            print("[!] Video upload failed.")
 
 def main():
-	credits()
-	creator_name = input("[+] Twitch Creator name: ").replace(" ","")
-	twitch_url = input("[+] Twitch VOD URL: ")
-	if not validateInput(twitch_url,r"^https://www.twitch.tv/videos/.*$"):
-		print("[!] Bad Input. Make sure you input twitch VOD URL and not the live stream URL.")
-		sys.exit()
-	start_time = input("[+] Clip Start time (HH:MM:SS): ")
-	if not validateInput(start_time,r"^[0-9][0-9]:[0-6][0-9]:[0-6][0-9]$"):
-		print("[!] Bad Input. Make sure you follow the input format correctly.")
-		sys.exit()
-	end_time = input("[+] Clip End time (HH:MM:SS): ")
-	if not validateInput(end_time,r"^[0-9][0-9]:[0-6][0-9]:[0-6][0-9]$"):
-		print("[!] Bad Input. Make sure you follow the input format correctly.")
-		sys.exit()
+    parser = argparse.ArgumentParser(description="AutoBot Clipper - GTA 6 Twitch to YouTube Shorts")
+    parser.add_argument("--mode", choices=["auto", "dashboard", "once", "interactive"], default="auto",
+                        help="Execution mode (default: auto)")
+    parser.add_argument("--port", type=int, default=5000, help="Dashboard port (default: 5000)")
+    parser.add_argument("--clips-per-vod", type=int, default=3, help="Max clips per VOD")
+    parser.add_argument("--poll-interval", type=int, default=600, help="Seconds between discovery polls")
+    args = parser.parse_args()
 
+    database.init_db()
 
-	offset, duration = getOffsetAndDuration(start_time, end_time)
-
-
-	if not os.path.isdir("clips"):
-		os.mkdir("clips")
-
-
-	filename = getTwitchClip(creator_name, twitch_url, offset, duration)
-
-	# Check if the download is successful
-	if os.path.isfile(filename):
-		print("[*] Downloaded clip succesfully! - %s"%filename)
-	else:
-		print("[!] Download failed!")
-		sys.exit(0)
-
-
-	print("[*] Opening clip in video player..")
-	os.startfile(filename)
-
-	op = input("[+] Do you want to trim the video? (Y/n): ")
-	if(op in ["Y","y",""]):
-		# Open video trimming util
-		if (videotrim_util.trimVideo(filename)):
-			print("[*] Video trimmed successfully!")
-			filename = filename.split(".ts")[0]+"_trimmed.ts"
-		else:
-			print("[!] Video trim failed!")
-			op = input("Do you want to (E)xit or (C)ontinue?")
-			if op in ["E","e",""]:
-				sys.exit()
-
-	elif op in ["N","n"]:
-		# Do not open video trimming util
-		pass
-
-
-	op = input("[+] Upload to YouTube? (Y/n): ")
-
-	if op in ["Y","y",""]:
-		# Upload created clip to YT
-
-		yt_title = input("[+] Video Title: ")
-		yt_description = input("[+] Video Description (leave empty for default description): ")
-		yt_tags = input("[+] Video Tags (seperated by comas): ")
-		yt_categoryId = input("[+] Category ID (Leave empty for Gaming): ")
-		yt_privacyStatus = input("[+] Privacy Status (public/private/unlisted): ")
-		yt_credits = input("[+] Credits for Original Creator: ")
-
-		if yt_title=="":
-			print("[!] Title can't be empty")
-
-		if yt_privacyStatus.lower() not in ["public","private","unlisted"]:
-			print("[!] Invalid privacy status")
-
-		if yt_description=="":
-			yt_description = default_description
-
-		if yt_categoryId=="":
-			yt_categoryId = default_categoryId
-
-
-		yt_description+="\n"+"Credits: \n"+yt_credits
-
-		print("[*] Uploading video to YouTube. This might take a while..be patient, do not close the script.")
-		videoId = ytupload_util.upload(filename, yt_title, yt_description, yt_tags, yt_categoryId, yt_privacyStatus)
-		
-		if videoId is not None:
-			print("[*] Succesfully uploaded video. ")
-			print("[*] https://www.youtube.com/watch?v=%s"%videoId)
-
-		else:
-			print("[!] Video upload failed.")
-			
-
+    if args.mode == "dashboard":
+        credits()
+        print(f"[*] Launching Web Dashboard at http://localhost:{args.port}...")
+        run_dashboard(port=args.port)
+    elif args.mode == "interactive":
+        run_legacy_interactive()
+    elif args.mode == "once":
+        credits()
+        print("[*] Running single automated cycle...")
+        sched = Scheduler(max_clips_per_vod=args.clips_per_vod)
+        result = sched.run_single_cycle()
+        print("[+] Cycle result:", result)
+    else:  # auto
+        credits()
+        print("[*] Starting Fully Automated GTA 6 Twitch Clipper & Shorts Uploader...")
+        sched = Scheduler(
+            poll_interval_seconds=args.poll_interval,
+            max_clips_per_vod=args.clips_per_vod
+        )
+        try:
+            sched.start_loop()
+        except KeyboardInterrupt:
+            print("\n[*] Stopping scheduler loop gracefully...")
+            sched.stop_loop()
 
 if __name__ == "__main__":
-	checks()
-	main()
-
-
-
-
-
+    main()

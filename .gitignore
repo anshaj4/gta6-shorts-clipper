@@ -1,0 +1,25 @@
+# Secrets and Credentials
+client_secrets.json
+credentials.txt
+token.json
+*.token
+.env
+
+# Virtual Environment
+venv/
+ENV/
+env/
+
+# Data and Media Directories
+downloads/
+clips/
+processed/
+logs/
+database/*.db
+tests/test_assets/
+
+# Python bytecode and cache
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/

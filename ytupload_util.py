@@ -1,108 +1,71 @@
-# -*- coding: utf-8 -*-
-
-# Sample Python code for youtube.videos.insert
-# NOTES:
-# 1. This sample code uploads a file and can't be executed via this interface.
-#    To test this code, you must run it locally using your own API credentials.
-#    See: https://developers.google.com/explorer-help/guides/code_samples#python
-# 2. This example makes a simple upload request. We recommend that you consider
-#    using resumable uploads instead, particularly if you are transferring large
-#    files or there's a high likelihood of a network interruption or other
-#    transmission failure. To learn more about resumable uploads, see:
-#    https://developers.google.com/api-client-library/python/guide/media_upload
-
 import os
+import sys
+from typing import Optional, List
+from modules.youtube_uploader import YouTubeUploader
 
-import google_auth_oauthlib.flow
-import google.oauth2.credentials
-
-import googleapiclient.discovery
-import googleapiclient.errors
-
-from googleapiclient.http import MediaFileUpload
-import ast
-
-scopes = ["https://www.googleapis.com/auth/youtube.upload"]
 default_description = "Thanks for watching. Please Subscribe."
 default_categoryId = "20"
 
-def upload(filename, title, description, tags, categoryId, privacyStatus):
-    # Disable OAuthlib's HTTPS verification when running locally.
-    # *DO NOT* leave this option enabled in production.
-    os.environ["OAUTHLIB_INSECURE_TRANSPORT"] = "1"
-
-    api_service_name = "youtube"
-    api_version = "v3"
-    client_secrets_file = "client_secrets.json"
-
-
+def upload(filename: str, title: str, description: str, tags: str, categoryId: str, privacyStatus: str) -> Optional[str]:
+    """
+    Modernized YouTube upload utility using OAuth 2.0 desktop flow, resumable uploads,
+    and automatic token refresh.
+    """
     try:
-        body=dict(snippet=dict(title=title,description=description,tags=tags,
-            categoryId=categoryId
-        ),
-        status=dict(privacyStatus=privacyStatus))
+        uploader = YouTubeUploader()
+        if not uploader.authenticate(open_browser=True):
+            print("[!] YouTube authentication failed.")
+            return None
 
-        # Get credentials and create an API client
-        flow = google_auth_oauthlib.flow.InstalledAppFlow.from_client_secrets_file(
-            client_secrets_file, scopes)
+        tag_list = [t.strip() for t in tags.split(",") if t.strip()] if isinstance(tags, str) else tags
 
-
-        f = open('credentials.txt','r')
-        creds = ast.literal_eval(f.read())
-        f.close()
-        credentials = google.oauth2.credentials.Credentials(**creds)
-        # credentials = flow.run_console()
-        youtube = googleapiclient.discovery.build(
-            api_service_name, api_version, credentials=credentials)
-
-        request = youtube.videos().insert(
-            notifySubscribers=True,
-            part=",".join(body.keys()),
-            body=body,
-            
-            # TODO: For this request to work, you must replace "YOUR_FILE"
-            #       with a pointer to the actual file you are uploading.
-            media_body=MediaFileUpload(filename)
+        video_id = uploader.upload_short(
+            video_path=filename,
+            title=title,
+            description=description or default_description,
+            tags=tag_list,
+            category_id=categoryId or default_categoryId,
+            privacy_status=privacyStatus.lower() if privacyStatus else "private"
         )
-        response = request.execute()
-        print(response)
-        # videoId = ast.literal_eval(response)['id']
-        videoId = response['id']
-        return videoId
-
+        return video_id
     except Exception as e:
-        print("[!!] ERROR - %s"%e)
+        print(f"[!!] ERROR uploading to YouTube: {e}")
         return None
-
-
 
 def manual_upload():
     filename = input("[+] File path: ")
     yt_title = input("[+] Video Title: ")
-    yt_description = input("[+] Video Description (leave empty for default description)")
-    yt_tags = input("[+] Video Tags (seperated by comas): ")
+    yt_description = input("[+] Video Description (leave empty for default description): ")
+    yt_tags = input("[+] Video Tags (separated by commas): ")
     yt_categoryId = input("[+] Category ID (Leave empty for Gaming): ")
-    yt_privacyStatus = input("[+] Privacy Status (public/private/unlisted): ")
+    yt_privacyStatus = input("[+] Privacy Status (public/private/unlisted, default: private): ")
     yt_credits = input("[+] Credits for Original Creator: ")
 
+    if not yt_title:
+        print("[!] Title cannot be empty")
+        return
 
-    if yt_title=="":
-        print("[!] Title can't be empty")
+    if not yt_privacyStatus:
+        yt_privacyStatus = "private"
 
-    if yt_privacyStatus.lower() not in ["public","private","unlisted"]:
-        print("[!] Invalid privacy status")
+    if yt_privacyStatus.lower() not in ["public", "private", "unlisted"]:
+        print("[!] Invalid privacy status. Defaulting to private.")
+        yt_privacyStatus = "private"
 
-    if yt_description=="":
+    if not yt_description:
         yt_description = default_description
 
-    if yt_categoryId=="":
+    if not yt_categoryId:
         yt_categoryId = default_categoryId
 
+    if yt_credits:
+        yt_description += f"\nCredits:\n{yt_credits}"
 
-    yt_description+="\n"+yt_credits
-
-    upload(filename, yt_title, yt_description, yt_tags, yt_categoryId, yt_privacyStatus)
-
+    vid = upload(filename, yt_title, yt_description, yt_tags, yt_categoryId, yt_privacyStatus)
+    if vid:
+        print(f"[*] Uploaded successfully! Video URL: https://www.youtube.com/watch?v={vid}")
+    else:
+        print("[!] Upload failed.")
 
 if __name__ == "__main__":
     manual_upload()
